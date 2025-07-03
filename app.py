@@ -10,7 +10,7 @@ try:
 except ImportError:
     st.error("google-generativeai is not installed. Please install it with 'pip install google-generativeai'.")
 
-API_KEY = os.getenv("GOOGLE_API_KEY") or st.secrets.get("GOOGLE_API_KEY", None)
+API_KEY = os.getenv("AIzaSyBnYol7F15XN7x6Um5H-VD0o23H8VqCjGk") or st.secrets.get("AIzaSyBnYol7F15XN7x6Um5H-VD0o23H8VqCjGk", None)
 if API_KEY:
     genai.configure(api_key=API_KEY)
 else:

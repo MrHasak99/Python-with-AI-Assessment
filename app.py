@@ -454,8 +454,8 @@ if st.session_state.get("show_bonus_buttons"):
                 "text_prompts": [{"text": prompt_text}],
                 "cfg_scale": 7,
                 "clip_guidance_preset": "FAST_BLUE",
-                "height": 512,
-                "width": 512,
+                "height": 320,
+                "width": 320,
                 "samples": 1,
                 "steps": 30
             }

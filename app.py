@@ -18,7 +18,7 @@ genai.configure(api_key=GEMINI_API_KEY)
 
 
 
-st.set_page_config(page_title="Hamad's Python Assessment", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="Hamad's Python Assessment", page_icon="🐍", layout="wide")
 st.markdown("""
 <style>
 body, .main .block-container, .stApp {
@@ -82,7 +82,7 @@ body, .main .block-container, .stApp {
 
 st.markdown("""
 <div style='display: flex; align-items: center; gap: 1rem;'>
-    <span style='font-size:2.5rem;'>🤖</span>
+    <span style='font-size:2.5rem;'>🐍</span>
     <span style='font-size:2.1rem; font-weight:700; letter-spacing:-1px;'>Hamad's Python Assessment</span>
 </div>
 <div style='color:#888; font-size:1.1rem; margin-bottom:0.5rem;'>A robust, multimodal, and interactive Streamlit app for Google Gemini.</div>

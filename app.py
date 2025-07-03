@@ -307,6 +307,3 @@ if generate_btn:
                     st.audio(audio_bytes, format="audio/mp3")
             except Exception as ex:
                 st.error(f"Audio generation error: {ex}")
-
-        except Exception as e:
-            st.error(f"Error: {e}")

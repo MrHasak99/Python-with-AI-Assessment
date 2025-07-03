@@ -453,7 +453,7 @@ if st.session_state.get("show_bonus_buttons"):
                 "Authorization": f"Bearer {stability_api_key}",
                 "Content-Type": "application/json"
             }
-            prompt_text = st.session_state.get("last_prompt", "AI generated image")
+            prompt_text = st.session_state.get("last_output_text", "AI generated image")
             import string
             cleaned = prompt_text.strip()
             cleaned_no_punct = cleaned.translate(str.maketrans('', '', string.punctuation)).replace(' ', '')

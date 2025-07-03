@@ -99,14 +99,6 @@ temperature = st.slider("Temperature (creativity)", min_value=0.0, max_value=1.0
 max_tokens = st.number_input("Max Output Tokens", min_value=50, max_value=2048, value=512, step=10)
 generate_btn = st.button("Generate")
 
-def render_conversation_history():
-    st.markdown("---")
-    st.subheader("Conversation History")
-    for msg in st.session_state.chat_history:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-
-render_conversation_history()
 output_placeholder = st.empty()
 
 st.sidebar.markdown("---")
@@ -299,6 +291,12 @@ if st.session_state.get("show_bonus_buttons"):
         if not displayed:
             st.markdown(f"**Gemini Output:**\n\n{last_output}")
 
+        if st.session_state.get("last_generated_image"):
+            import base64
+            st.image(base64.b64decode(st.session_state["last_generated_image"]), caption="Generated Image", use_container_width=True)
+        if st.session_state.get("last_generated_audio"):
+            st.audio(st.session_state["last_generated_audio"], format="audio/mp3")
+
     if imggen_clicked:
         with st.spinner("Generating image from text using Stability AI..."):
             stability_api_key = "sk-A4CbJHxRTpefmasipb3JNdODGjX49Q4OPNTzqf9r7zK3CMGg"
@@ -326,10 +324,11 @@ if st.session_state.get("show_bonus_buttons"):
                     response_json = r.json()
                     if "artifacts" in response_json and len(response_json["artifacts"]) > 0:
                         img_b64 = response_json["artifacts"][0]["base64"]
-                        import base64
+                        st.session_state["last_generated_image"] = img_b64
                         st.image(base64.b64decode(img_b64), caption="Generated Image", use_container_width=True)
                     else:
                         st.error("Stability AI did not return any images.")
+                        st.session_state["last_generated_image"] = None
                 elif r.status_code == 400:
                     st.error("Stability AI: Bad request. The prompt must be 1-2000 characters. Please try a shorter or non-empty prompt.")
                 elif r.status_code == 401:
@@ -344,6 +343,7 @@ if st.session_state.get("show_bonus_buttons"):
                     st.error(f"Image generation failed. Status: {r.status_code}, Response: {r.text}")
             except Exception as ex:
                 st.error(f"Image generation error: {ex}")
+                st.session_state["last_generated_image"] = None
 
     if ttsgen_clicked:
         with st.spinner("Generating audio..."):
@@ -359,6 +359,8 @@ if st.session_state.get("show_bonus_buttons"):
                         tts.save(fp.name)
                     with open(fp.name, "rb") as f:
                         audio_bytes = f.read()
+                    st.session_state["last_generated_audio"] = audio_bytes
                     st.audio(audio_bytes, format="audio/mp3")
             except Exception as ex:
                 st.error(f"Audio generation error: {ex}")
+                st.session_state["last_generated_audio"] = None

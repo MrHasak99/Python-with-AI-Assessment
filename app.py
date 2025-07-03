@@ -274,12 +274,30 @@ if st.session_state.get("show_bonus_buttons"):
     with col2:
         ttsgen_clicked = st.button("Generate Audio from Response", key="ttsgen")
 
-    if imggen_clicked or ttsgen_clicked:
-        st.markdown("---")
-        st.subheader("Conversation History")
-        for msg in st.session_state.chat_history:
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
+    st.markdown("---")
+    st.subheader("Conversation History")
+    for msg in st.session_state.chat_history:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    last_output = st.session_state.get("last_output_text", "")
+    last_prompt = st.session_state.get("last_prompt", "")
+    if last_output:
+        import json
+        displayed = False
+        if any(x in last_prompt.lower() for x in ["json", "list of", "table", "structured", "dictionary", "summarize", "summary", "extract", "parse"]):
+            try:
+                json_start = last_output.find('{')
+                json_end = last_output.rfind('}') + 1
+                if json_start != -1 and json_end != -1:
+                    json_str = last_output[json_start:json_end]
+                    parsed = json.loads(json_str)
+                    st.json(parsed)
+                    displayed = True
+            except Exception:
+                pass
+        if not displayed:
+            st.markdown(f"**Gemini Output:**\n\n{last_output}")
 
     if imggen_clicked:
         with st.spinner("Generating image from text using Stability AI..."):

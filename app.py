@@ -99,12 +99,14 @@ temperature = st.slider("Temperature (creativity)", min_value=0.0, max_value=1.0
 max_tokens = st.number_input("Max Output Tokens", min_value=50, max_value=2048, value=512, step=10)
 generate_btn = st.button("Generate")
 
-st.markdown("---")
-st.subheader("Conversation History")
-for msg in st.session_state.chat_history:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+def render_conversation_history():
+    st.markdown("---")
+    st.subheader("Conversation History")
+    for msg in st.session_state.chat_history:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
+render_conversation_history()
 output_placeholder = st.empty()
 
 st.sidebar.markdown("---")
@@ -307,7 +309,7 @@ if st.session_state.get("show_bonus_buttons"):
                     if "artifacts" in response_json and len(response_json["artifacts"]) > 0:
                         img_b64 = response_json["artifacts"][0]["base64"]
                         import base64
-                        st.image(base64.b64decode(img_b64), caption="Generated Image", use_column_width=True)
+                        st.image(base64.b64decode(img_b64), caption="Generated Image", use_container_width=True)
                     else:
                         st.error("Stability AI did not return any images.")
                 elif r.status_code == 400:

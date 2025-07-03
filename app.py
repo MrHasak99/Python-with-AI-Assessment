@@ -1,6 +1,12 @@
 import os
 import streamlit as st
 import google.generativeai as genai
+import tempfile
+import pandas as pd
+import PyPDF2
+from gtts import gTTS
+import base64
+import requests
 
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", st.secrets["GEMINI_API_KEY"] if "GEMINI_API_KEY" in st.secrets else None)
@@ -29,8 +35,20 @@ personas = {
     "Creative Writer": "You are a creative and imaginative writer.",
     "Technical Expert": "You are a technical expert who explains things clearly and concisely.",
     "Witty Historian": "You are a witty historian who adds fun facts and humor.",
-    "Friendly Assistant": "You are a friendly and helpful assistant.",
+    "Friendly Assistant": "You are a friendly and helpful assistant."
 }
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("Custom Persona / Context (Simulated Fine-tuning)")
+custom_persona = st.sidebar.text_area(
+    "Add custom instructions, facts, or personality traits for the AI (optional):",
+    value=st.session_state.get("custom_persona", ""),
+    help="This will be prepended to every prompt."
+)
+if st.sidebar.button("Save Custom Persona"):
+    st.session_state["custom_persona"] = custom_persona
+    st.sidebar.success("Custom persona/context saved.")
+
 
 st.sidebar.header("AI Controls")
 template_choice = st.sidebar.selectbox("Choose a prompt template", ["(None)"] + list(prompt_templates.keys()))
@@ -63,6 +81,19 @@ if template_choice != "(None)":
 else:
     default_prompt = ""
 
+st.sidebar.markdown("---")
+st.sidebar.subheader("Knowledge Base (RAG)")
+kb_file = st.sidebar.file_uploader("Upload a .txt or .pdf knowledge base", type=["txt", "pdf"])
+kb_text = ""
+if kb_file:
+    if kb_file.type == "application/pdf":
+        reader = PyPDF2.PdfReader(kb_file)
+        kb_text = "\n".join(page.extract_text() for page in reader.pages if page.extract_text())
+    else:
+        kb_text = kb_file.read().decode("utf-8", errors="ignore")
+    st.sidebar.success("Knowledge base loaded.")
+    st.sidebar.info(f"Loaded {len(kb_text)} characters.")
+
 prompt = st.text_area("Enter your prompt:", value=default_prompt, height=120, key="main_prompt")
 temperature = st.slider("Temperature (creativity)", min_value=0.0, max_value=1.0, value=0.5, step=0.05, help="Higher values = more creative, lower = more focused.")
 max_tokens = st.number_input("Max Output Tokens", min_value=50, max_value=2048, value=512, step=10)
@@ -75,6 +106,15 @@ for msg in st.session_state.chat_history:
         st.markdown(msg["content"])
 
 output_placeholder = st.empty()
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("Structured Data (CSV)")
+csv_file = st.sidebar.file_uploader("Upload a CSV file for data Q&A", type=["csv"])
+df = None
+if csv_file:
+    df = pd.read_csv(csv_file)
+    st.sidebar.success(f"CSV loaded: {df.shape[0]} rows, {df.shape[1]} columns.")
+    st.sidebar.dataframe(df.head())
 
 
 def get_weather(city: str):
@@ -93,7 +133,29 @@ if generate_btn:
         st.error("Your prompt contains blacklisted keywords/phrases. Please revise your input.")
     else:
         persona_instruction = personas[persona_choice]
-        full_prompt = f"{persona_instruction}\n\n{prompt.strip()}"
+        custom_context = st.session_state.get("custom_persona", "")
+        full_prompt = ""
+        if custom_context:
+            full_prompt += f"{custom_context}\n\n"
+        full_prompt += f"{persona_instruction}\n\n{prompt.strip()}"
+
+        if kb_text:
+            import re
+            keywords = [w for w in prompt.strip().split() if len(w) > 3]
+            found = []
+            for kw in keywords:
+                matches = re.findall(rf"(.{{0,60}}{re.escape(kw)}.{{0,60}})", kb_text, re.IGNORECASE)
+                found.extend(matches)
+            found = list(set(found))[:5]
+            if found:
+                kb_context = "\n---\n".join(found)
+                full_prompt = f"[Knowledge Base Context]\n{kb_context}\n\n{full_prompt}"
+                st.info("Relevant knowledge base context injected into prompt.")
+
+        if df is not None and any(x in prompt.lower() for x in ["csv", "table", "data", "row", "column", "pandas", "dataframe"]):
+            sample = df.head(10).to_csv(index=False)
+            full_prompt = f"[CSV Data Sample]\n{sample}\n\n{full_prompt}"
+            st.info("CSV data sample injected into prompt.")
 
         tool_call_result = None
         tool_call_city = None
@@ -108,48 +170,69 @@ if generate_btn:
                 st.success(f"Result: {tool_call_result}")
                 status.update(label="Weather data fetched.", state="complete")
 
+        def multi_step_reasoning(prompt):
+            steps = [
+                ("Step 1: Analyze intent", f"Analyze the following user request and break it into steps: {prompt}"),
+                ("Step 2: Generate initial draft", f"Write a draft response for: {prompt}"),
+                ("Step 3: Refine output", f"Improve and clarify the following draft: [DRAFT]"),
+            ]
+            outputs = []
+            for i, (label, step_prompt) in enumerate(steps):
+                with st.expander(label, expanded=(i==0)):
+                    st.info(f"Prompt: {step_prompt}")
+                    model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+                    response = model.generate_content(step_prompt)
+                    st.success(response.text)
+                    outputs.append(response.text)
+                    if "[DRAFT]" in steps[min(i+1, len(steps)-1)][1]:
+                        steps[min(i+1, len(steps)-1)] = (steps[min(i+1, len(steps)-1)][0], steps[min(i+1, len(steps)-1)][1].replace("[DRAFT]", response.text))
+            return outputs[-1]
+
         try:
             with st.spinner("Generating response..."):
-                if uploaded_image:
-                    import PIL.Image
-                    from io import BytesIO
-                    image = PIL.Image.open(BytesIO(uploaded_image.read()))
-                    model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
-                    multimodal_prompt = full_prompt
-                    if tool_call_result:
-                        multimodal_prompt = f"Weather info: {tool_call_result}\n\n{full_prompt}"
-                    response = model.generate_content(
-                        [multimodal_prompt, image],
-                        generation_config={
-                            "temperature": temperature,
-                            "max_output_tokens": int(max_tokens),
-                        },
-                    )
+                if any(x in prompt.lower() for x in ["multi-step", "chain", "reasoning", "step by step"]):
+                    output_text = multi_step_reasoning(full_prompt)
                 else:
-                    model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
-                    text_prompt = full_prompt
-                    if tool_call_result:
-                        text_prompt = f"Weather info: {tool_call_result}\n\n{full_prompt}"
-                    response = model.generate_content(
-                        text_prompt,
-                        generation_config={
-                            "temperature": temperature,
-                            "max_output_tokens": int(max_tokens),
-                        },
-                    )
-                output_text = ""
-                if hasattr(response, "text"):
-                    if hasattr(response, "__iter__") and not isinstance(response.text, str):
-                        for chunk in response:
-                            output_text += chunk.text
-                            output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
+                    if uploaded_image:
+                        import PIL.Image
+                        from io import BytesIO
+                        image = PIL.Image.open(BytesIO(uploaded_image.read()))
+                        model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+                        multimodal_prompt = full_prompt
+                        if tool_call_result:
+                            multimodal_prompt = f"Weather info: {tool_call_result}\n\n{full_prompt}"
+                        response = model.generate_content(
+                            [multimodal_prompt, image],
+                            generation_config={
+                                "temperature": temperature,
+                                "max_output_tokens": int(max_tokens),
+                            },
+                        )
                     else:
-                        for word in response.text.split():
-                            output_text += word + " "
-                            output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
-                else:
-                    output_text = str(response)
-                    output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
+                        model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+                        text_prompt = full_prompt
+                        if tool_call_result:
+                            text_prompt = f"Weather info: {tool_call_result}\n\n{full_prompt}"
+                        response = model.generate_content(
+                            text_prompt,
+                            generation_config={
+                                "temperature": temperature,
+                                "max_output_tokens": int(max_tokens),
+                            },
+                        )
+                    output_text = ""
+                    if hasattr(response, "text"):
+                        if hasattr(response, "__iter__") and not isinstance(response.text, str):
+                            for chunk in response:
+                                output_text += chunk.text
+                                output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
+                        else:
+                            for word in response.text.split():
+                                output_text += word + " "
+                                output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
+                    else:
+                        output_text = str(response)
+                        output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
 
                 if any(b in output_text.lower() for b in blacklist):
                     st.warning("AI output contains blacklisted keywords/phrases. Please review the content.")
@@ -185,5 +268,29 @@ if generate_btn:
                     "role": "assistant",
                     "content": output_text
                 })
+
+                st.markdown("---")
+                st.subheader("Bonus: Generate Image from AI Output")
+                if st.button("Generate Image from Response", key="imggen"):
+                    with st.spinner("Generating image from text..."):
+                        api_url = "https://api.deepai.org/api/text2img"
+                        api_key = os.getenv("DEEPAI_API_KEY", "quickstart-QUdJIGlzIGNvbWluZy4uLi4K")
+                        r = requests.post(api_url, data={"text": output_text}, headers={"api-key": api_key})
+                        if r.status_code == 200 and "output_url" in r.json():
+                            st.image(r.json()["output_url"], caption="Generated Image", use_column_width=True)
+                        else:
+                            st.error("Image generation failed.")
+
+                st.subheader("Bonus: Listen to AI Response")
+                if st.button("Generate Audio from Response", key="ttsgen"):
+                    with st.spinner("Generating audio..."):
+                        tts = gTTS(output_text)
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+                            tts.save(fp.name)
+                            audio_bytes = fp.read()
+                        with open(fp.name, "rb") as f:
+                            audio_bytes = f.read()
+                        st.audio(audio_bytes, format="audio/mp3")
+
         except Exception as e:
             st.error(f"Error: {e}")

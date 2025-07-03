@@ -451,7 +451,23 @@ if st.session_state.get("show_bonus_buttons"):
     st.subheader("Bonus Features")
     col1, col2 = st.columns(2)
     with col1:
-        imggen_clicked = st.button("Generate Image from Response", key="imggen")
+        last_output_text = st.session_state.get("last_output_text", "")
+        cleaned_img_prompt = last_output_text.strip()
+        import string, re
+        cleaned_img_prompt = re.sub(r'[\r\n\t]+', ' ', cleaned_img_prompt)
+        cleaned_img_prompt = re.sub(r'\s+', ' ', cleaned_img_prompt)
+        img_prompt_invalid = not (1 <= len(cleaned_img_prompt) <= 2000)
+        imggen_clicked = st.button(
+            "Generate Image from Response",
+            key="imggen",
+            disabled=img_prompt_invalid,
+            help=(
+                "Prompt must be 1-2000 characters. "
+                "Button is disabled for empty or too long prompts."
+            ) if img_prompt_invalid else None
+        )
+        if img_prompt_invalid:
+            st.info("Image generation prompt must be 1-2000 characters. Please revise the AI output or try a different prompt.")
     with col2:
         ttsgen_clicked = st.button("Generate Audio from Response", key="ttsgen")
 

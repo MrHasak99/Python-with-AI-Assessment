@@ -266,7 +266,10 @@ if generate_btn:
 if st.session_state.get("show_bonus_buttons"):
     st.markdown("---")
     st.subheader("Bonus: Generate Image from AI Output")
-    if st.button("Generate Image from Response", key="imggen"):
+    imggen_clicked = st.button("Generate Image from Response", key="imggen")
+    ttsgen_clicked = st.button("Generate Audio from Response", key="ttsgen")
+
+    if imggen_clicked:
         with st.spinner("Generating image from text using Stability AI..."):
             stability_api_key = "sk-A4CbJHxRTpefmasipb3JNdODGjX49Q4OPNTzqf9r7zK3CMGg"
             api_url = "https://api.stability.ai/v1/generation/stable-diffusion-v1-5/text-to-image"
@@ -274,8 +277,11 @@ if st.session_state.get("show_bonus_buttons"):
                 "Authorization": f"Bearer {stability_api_key}",
                 "Content-Type": "application/json"
             }
+            prompt_text = st.session_state["last_output_text"][:2000] if st.session_state["last_output_text"] else "AI generated image"
+            if not prompt_text.strip():
+                prompt_text = "AI generated image"
             payload = {
-                "text_prompts": [{"text": st.session_state["last_output_text"]}],
+                "text_prompts": [{"text": prompt_text}],
                 "cfg_scale": 7,
                 "clip_guidance_preset": "FAST_BLUE",
                 "height": 512,
@@ -293,6 +299,8 @@ if st.session_state.get("show_bonus_buttons"):
                         st.image(base64.b64decode(img_b64), caption="Generated Image", use_column_width=True)
                     else:
                         st.error("Stability AI did not return any images.")
+                elif r.status_code == 400:
+                    st.error("Stability AI: Bad request. The prompt must be 1-2000 characters. Please try a shorter or non-empty prompt.")
                 elif r.status_code == 401:
                     st.error("Stability AI: Unauthorized. Please check your API key.")
                 elif r.status_code == 403:
@@ -305,7 +313,7 @@ if st.session_state.get("show_bonus_buttons"):
                 st.error(f"Image generation error: {ex}")
 
     st.subheader("Bonus: Listen to AI Response")
-    if st.button("Generate Audio from Response", key="ttsgen"):
+    if ttsgen_clicked:
         with st.spinner("Generating audio..."):
             try:
                 output_text = st.session_state["last_output_text"]

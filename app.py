@@ -274,7 +274,7 @@ if generate_btn:
                 if st.button("Generate Image from Response", key="imggen"):
                     with st.spinner("Generating image from text..."):
                         api_url = "https://api.deepai.org/api/text2img"
-                        api_key = os.getenv("DEEPAI_API_KEY", "quickstart-QUdJIGlzIGNvbWluZy4uLi4K")
+                        api_key = st.secrets.get("DEEPAI_API_KEY", os.getenv("DEEPAI_API_KEY", "quickstart-QUdJIGlzIGNvbWluZy4uLi4K"))
                         r = requests.post(api_url, data={"text": output_text}, headers={"api-key": api_key})
                         if r.status_code == 200 and "output_url" in r.json():
                             st.image(r.json()["output_url"], caption="Generated Image", use_column_width=True)

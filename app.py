@@ -272,10 +272,17 @@ if st.session_state.get("show_bonus_buttons"):
     with col2:
         ttsgen_clicked = st.button("Generate Audio from Response", key="ttsgen")
 
+    if imggen_clicked or ttsgen_clicked:
+        st.markdown("---")
+        st.subheader("Conversation History")
+        for msg in st.session_state.chat_history:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
     if imggen_clicked:
         with st.spinner("Generating image from text using Stability AI..."):
             stability_api_key = "sk-A4CbJHxRTpefmasipb3JNdODGjX49Q4OPNTzqf9r7zK3CMGg"
-            api_url = "https://api.stability.ai/v1/generation/stable-diffusion-v1-5/text-to-image"
+            api_url = "https://api.stability.ai/v1/generation/stable-diffusion-v1-6/text-to-image"
             headers = {
                 "Authorization": f"Bearer {stability_api_key}",
                 "Content-Type": "application/json"
@@ -309,6 +316,8 @@ if st.session_state.get("show_bonus_buttons"):
                     st.error("Stability AI: Unauthorized. Please check your API key.")
                 elif r.status_code == 403:
                     st.error("Stability AI: Access forbidden. Check your account limits or API key.")
+                elif r.status_code == 404:
+                    st.error("Stability AI: The specified engine was not found. Please check the engine name or your API access.")
                 elif r.status_code == 429:
                     st.error("Stability AI: Rate limit exceeded. Try again later.")
                 else:

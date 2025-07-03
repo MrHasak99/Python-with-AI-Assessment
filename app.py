@@ -265,9 +265,12 @@ if generate_btn:
 
 if st.session_state.get("show_bonus_buttons"):
     st.markdown("---")
-    st.subheader("Bonus: Generate Image from AI Output")
-    imggen_clicked = st.button("Generate Image from Response", key="imggen")
-    ttsgen_clicked = st.button("Generate Audio from Response", key="ttsgen")
+    st.subheader("Bonus Features")
+    col1, col2 = st.columns(2)
+    with col1:
+        imggen_clicked = st.button("Generate Image from Response", key="imggen")
+    with col2:
+        ttsgen_clicked = st.button("Generate Audio from Response", key="ttsgen")
 
     if imggen_clicked:
         with st.spinner("Generating image from text using Stability AI..."):
@@ -277,8 +280,9 @@ if st.session_state.get("show_bonus_buttons"):
                 "Authorization": f"Bearer {stability_api_key}",
                 "Content-Type": "application/json"
             }
-            prompt_text = st.session_state["last_output_text"][:2000] if st.session_state["last_output_text"] else "AI generated image"
-            if not prompt_text.strip():
+            prompt_text = st.session_state.get("last_prompt", "AI generated image")
+            prompt_text = prompt_text.strip()[:2000] if prompt_text else "AI generated image"
+            if not prompt_text:
                 prompt_text = "AI generated image"
             payload = {
                 "text_prompts": [{"text": prompt_text}],
@@ -312,7 +316,6 @@ if st.session_state.get("show_bonus_buttons"):
             except Exception as ex:
                 st.error(f"Image generation error: {ex}")
 
-    st.subheader("Bonus: Listen to AI Response")
     if ttsgen_clicked:
         with st.spinner("Generating audio..."):
             try:

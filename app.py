@@ -264,8 +264,7 @@ if generate_btn:
                 st.session_state["last_output_text"] = output_text
                 st.session_state["last_prompt"] = prompt.strip()
 
-        except Exception as e:
-            st.error(f"Error: {e}")
+
 
 if st.session_state.get("last_output_text"):
     st.markdown("---")

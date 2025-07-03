@@ -1,3 +1,4 @@
+
 import os
 import streamlit as st
 import google.generativeai as genai
@@ -18,7 +19,7 @@ genai.configure(api_key=GEMINI_API_KEY)
 
 
 
-st.set_page_config(page_title="Hamad's Python Assessment", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="Hamad's Python with AI Assessment", page_icon="🤖", layout="wide")
 st.markdown("""
 <style>
 body, .main .block-container, .stApp {
@@ -83,7 +84,7 @@ body, .main .block-container, .stApp {
 st.markdown("""
 <div style='display: flex; align-items: center; gap: 1rem;'>
     <span style='font-size:2.5rem;'>🐍</span>
-    <span style='font-size:2.1rem; font-weight:700; letter-spacing:-1px;'>Hamad's Python Assessment</span>
+    <span style='font-size:2.1rem; font-weight:700; letter-spacing:-1px;'>Hamad's Python with AI Assessment</span>
 </div>
 <div style='color:#888; font-size:1.1rem; margin-bottom:0.5rem;'>A robust, multimodal, and interactive Streamlit app for Google Gemini.</div>
 """, unsafe_allow_html=True)
@@ -109,7 +110,7 @@ personas = {
     "Witty Historian": "You are a witty historian who adds fun facts and humor.",
     "Friendly Assistant": "You are a friendly and helpful assistant."
 }
-st.sidebar.subheader("Custom Persona / Context (Simulated Fine-tuning)")    
+st.sidebar.subheader("Custom Persona / Context (Simulated Fine-tuning)")
 custom_persona = st.sidebar.text_area(
     "Add custom instructions, facts, or personality traits for the AI (optional):",
     value=st.session_state.get("custom_persona", ""),

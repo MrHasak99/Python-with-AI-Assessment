@@ -23,13 +23,13 @@ st.markdown("""
 <style>
 body, .main .block-container, .stApp {
     background: #181a20 !important;
-    color: #f5f5f7 !important;
+    color: #e6e6e6 !important;
 }
 .stMarkdown, .stMarkdown * {
-    color: #f5f5f7 !important;
+    color: #e6e6e6 !important;
 }
 .stMarkdown h2, .stMarkdown h3, .stMarkdown h4 {
-    color: #ffd600 !important;
+    color: #ffe082 !important;
 }
 .st-emotion-cache-1kyxreq, .st-emotion-cache-1v0mbdj, .st-emotion-cache-1avcm0n {
     padding-top: 0.5rem !important;
@@ -39,43 +39,43 @@ body, .main .block-container, .stApp {
 .stTextArea textarea {
     background: #23262f;
     border-radius: 8px;
-    border: 1.5px solid #ffd600;
+    border: 1.5px solid #ffe082;
     font-size: 1.1rem;
-    color: #f5f5f7;
+    color: #e6e6e6;
 }
 .stButton>button {
-    background: linear-gradient(90deg, #ffd600 0%, #ffb300 100%);
+    background: linear-gradient(90deg, #ffe082 0%, #ffd600 100%);
     color: #181a20;
     border-radius: 8px;
     font-weight: 600;
     border: none;
-    box-shadow: 0 2px 8px #ffd60044;
+    box-shadow: 0 2px 8px #ffe08244;
     transition: 0.2s;
 }
 .stButton>button:hover {
-    background: linear-gradient(90deg, #ffb300 0%, #ffd600 100%);
+    background: linear-gradient(90deg, #ffd600 0%, #ffe082 100%);
     color: #181a20;
 }
 .stDataFrame, .stDataFrame table {
     background: #23262f;
     border-radius: 8px;
     font-size: 1.05rem;
-    color: #f5f5f7;
+    color: #e6e6e6;
 }
 .stExpanderHeader {
     font-weight: 600;
-    color: #ffd600;
+    color: #ffe082;
 }
 .stMarkdown code {
     background: #23262f;
-    color: #ffd600 !important;
+    color: #ffe082 !important;
     border-radius: 4px;
     padding: 2px 6px;
 }
 .stStatus, .stInfo, .stSuccess, .stWarning {
     border-radius: 8px !important;
     background: #23262f !important;
-    color: #ffd600 !important;
+    color: #ffe082 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -395,9 +395,9 @@ if generate_btn:
             cost_per_1k = 0.000125
             estimated_cost = (total_tokens / 1000) * cost_per_1k
             st.markdown(f"""
-<div style='background:#fffde7; color:#d84315; border-radius:8px; padding:10px 16px; font-size:1.08rem; border:1.5px solid #ffe082; margin-bottom:0.5rem;'>
-<b>Estimated tokens used:</b> {total_tokens} <span style='color:#888;'>(Prompt: {prompt_tokens}, Response: {response_tokens})</span><br>
-<b>Estimated cost:</b> ${estimated_cost:.6f}
+<div style='background:#23262f; color:#ffe082; border-radius:8px; padding:10px 16px; font-size:1.08rem; border:1.5px solid #ffe082; margin-bottom:0.5rem;'>
+<b>Estimated tokens used:</b> <span style='color:#fffde7'>{total_tokens}</span> <span style='color:#bdbdbd;'>(Prompt: {prompt_tokens}, Response: {response_tokens})</span><br>
+<b>Estimated cost:</b> <span style='color:#fffde7'>${estimated_cost:.6f}</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -454,7 +454,8 @@ if st.session_state.get("show_bonus_buttons"):
                 "Content-Type": "application/json"
             }
             prompt_text = st.session_state.get("last_prompt", "AI generated image")
-            if not prompt_text or not prompt_text.strip() or len(prompt_text.strip()) < 5:
+            import string
+            if not prompt_text or not prompt_text.strip() or len(prompt_text.strip()) < 5 or all(c in string.punctuation for c in prompt_text.strip()):
                 prompt_text = "AI generated image"
             else:
                 prompt_text = prompt_text.strip()[:2000]

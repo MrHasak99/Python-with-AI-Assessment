@@ -267,25 +267,38 @@ if st.session_state.get("show_bonus_buttons"):
     st.markdown("---")
     st.subheader("Bonus: Generate Image from AI Output")
     if st.button("Generate Image from Response", key="imggen"):
-        with st.spinner("Generating image from text..."):
-            api_url = "https://api.deepai.org/api/text2img"
-            api_key = None
-            if "DEEPAI_API_KEY" in st.secrets:
-                api_key = st.secrets["DEEPAI_API_KEY"]
-            elif os.getenv("DEEPAI_API_KEY"):
-                api_key = os.getenv("DEEPAI_API_KEY")
-            else:
-                api_key = "quickstart-QUdJIGlzIGNvbWluZy4uLi4K"
-            if not api_key or api_key == "quickstart-QUdJIGlzIGNvbWluZy4uLi4K":
-                st.warning("Using DeepAI demo API key. For best results, add your own DEEPAI_API_KEY to Streamlit secrets.")
+        with st.spinner("Generating image from text using Stability AI..."):
+            stability_api_key = "sk-A4CbJHxRTpefmasipb3JNdODGjX49Q4OPNTzqf9r7zK3CMGg"
+            api_url = "https://api.stability.ai/v1/generation/stable-diffusion-v1-5/text-to-image"
+            headers = {
+                "Authorization": f"Bearer {stability_api_key}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "text_prompts": [{"text": st.session_state["last_output_text"]}],
+                "cfg_scale": 7,
+                "clip_guidance_preset": "FAST_BLUE",
+                "height": 512,
+                "width": 512,
+                "samples": 1,
+                "steps": 30
+            }
             try:
-                r = requests.post(api_url, data={"text": st.session_state["last_output_text"]}, headers={"api-key": api_key}, timeout=30)
-                if r.status_code == 200 and "output_url" in r.json():
-                    st.image(r.json()["output_url"], caption="Generated Image", use_column_width=True)
+                r = requests.post(api_url, json=payload, headers=headers, timeout=60)
+                if r.status_code == 200:
+                    response_json = r.json()
+                    if "artifacts" in response_json and len(response_json["artifacts"]) > 0:
+                        img_b64 = response_json["artifacts"][0]["base64"]
+                        import base64
+                        st.image(base64.b64decode(img_b64), caption="Generated Image", use_column_width=True)
+                    else:
+                        st.error("Stability AI did not return any images.")
+                elif r.status_code == 401:
+                    st.error("Stability AI: Unauthorized. Please check your API key.")
                 elif r.status_code == 403:
-                    st.error("DeepAI API key is invalid or quota exceeded. Please set your own DEEPAI_API_KEY in Streamlit secrets.")
+                    st.error("Stability AI: Access forbidden. Check your account limits or API key.")
                 elif r.status_code == 429:
-                    st.error("DeepAI API rate limit exceeded. Try again later or use your own API key.")
+                    st.error("Stability AI: Rate limit exceeded. Try again later.")
                 else:
                     st.error(f"Image generation failed. Status: {r.status_code}, Response: {r.text}")
             except Exception as ex:

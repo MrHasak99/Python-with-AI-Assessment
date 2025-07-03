@@ -455,10 +455,12 @@ if st.session_state.get("show_bonus_buttons"):
             }
             prompt_text = st.session_state.get("last_prompt", "AI generated image")
             import string
-            if not prompt_text or not prompt_text.strip() or len(prompt_text.strip()) < 5 or all(c in string.punctuation for c in prompt_text.strip()):
+            cleaned = prompt_text.strip()
+            cleaned_no_punct = cleaned.translate(str.maketrans('', '', string.punctuation)).replace(' ', '')
+            if not cleaned or len(cleaned) < 5 or not cleaned_no_punct or len(cleaned_no_punct) < 3:
                 prompt_text = "AI generated image"
             else:
-                prompt_text = prompt_text.strip()[:2000]
+                prompt_text = cleaned[:2000]
             payload = {
                 "text_prompts": [{"text": prompt_text}],
                 "cfg_scale": 7,

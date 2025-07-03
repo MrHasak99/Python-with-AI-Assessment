@@ -22,14 +22,14 @@ st.set_page_config(page_title="Gemini AI Playground", page_icon="🤖", layout="
 st.markdown("""
 <style>
 body, .main .block-container, .stApp {
-    background: #fff !important;
-    color: #222 !important;
+    background: #181a20 !important;
+    color: #f5f5f7 !important;
 }
 .stMarkdown, .stMarkdown * {
-    color: #222 !important;
+    color: #f5f5f7 !important;
 }
 .stMarkdown h2, .stMarkdown h3, .stMarkdown h4 {
-    color: #ff9100 !important;
+    color: #ffd600 !important;
 }
 .st-emotion-cache-1kyxreq, .st-emotion-cache-1v0mbdj, .st-emotion-cache-1avcm0n {
     padding-top: 0.5rem !important;
@@ -37,43 +37,45 @@ body, .main .block-container, .stApp {
     margin-bottom: 0.5rem !important;
 }
 .stTextArea textarea {
-    background: #fffbe7;
+    background: #23262f;
     border-radius: 8px;
-    border: 1.5px solid #ffe082;
+    border: 1.5px solid #ffd600;
     font-size: 1.1rem;
-    color: #222;
+    color: #f5f5f7;
 }
 .stButton>button {
     background: linear-gradient(90deg, #ffd600 0%, #ffb300 100%);
-    color: #222;
+    color: #181a20;
     border-radius: 8px;
     font-weight: 600;
     border: none;
-    box-shadow: 0 2px 8px #ffe08244;
+    box-shadow: 0 2px 8px #ffd60044;
     transition: 0.2s;
 }
 .stButton>button:hover {
     background: linear-gradient(90deg, #ffb300 0%, #ffd600 100%);
-    color: #111;
+    color: #181a20;
 }
 .stDataFrame, .stDataFrame table {
-    background: #fff;
+    background: #23262f;
     border-radius: 8px;
     font-size: 1.05rem;
-    color: #222;
+    color: #f5f5f7;
 }
 .stExpanderHeader {
     font-weight: 600;
-    color: #ff9100;
+    color: #ffd600;
 }
 .stMarkdown code {
-    background: #fffde7;
-    color: #d84315 !important;
+    background: #23262f;
+    color: #ffd600 !important;
     border-radius: 4px;
     padding: 2px 6px;
 }
 .stStatus, .stInfo, .stSuccess, .stWarning {
     border-radius: 8px !important;
+    background: #23262f !important;
+    color: #ffd600 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -452,9 +454,10 @@ if st.session_state.get("show_bonus_buttons"):
                 "Content-Type": "application/json"
             }
             prompt_text = st.session_state.get("last_prompt", "AI generated image")
-            prompt_text = prompt_text.strip()[:2000] if prompt_text else "AI generated image"
-            if not prompt_text:
+            if not prompt_text or not prompt_text.strip() or len(prompt_text.strip()) < 5:
                 prompt_text = "AI generated image"
+            else:
+                prompt_text = prompt_text.strip()[:2000]
             payload = {
                 "text_prompts": [{"text": prompt_text}],
                 "cfg_scale": 7,
@@ -471,7 +474,7 @@ if st.session_state.get("show_bonus_buttons"):
                     if "artifacts" in response_json and len(response_json["artifacts"]) > 0:
                         img_b64 = response_json["artifacts"][0]["base64"]
                         st.session_state["last_generated_image"] = img_b64
-                        st.image(base64.b64decode(img_b64), caption="Generated Image", use_container_width=True)
+                        st.image(base64.b64decode(img_b64), caption="Generated Image (128x128)", width=128)
                     else:
                         st.error("Stability AI did not return any images.")
                         st.session_state["last_generated_image"] = None

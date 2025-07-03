@@ -260,60 +260,60 @@ if generate_btn:
                 estimated_cost = (total_tokens / 1000) * cost_per_1k
                 st.info(f"Estimated tokens used: {total_tokens} (Prompt: {prompt_tokens}, Response: {response_tokens})\nEstimated cost: ${estimated_cost:.6f}")
 
-                st.session_state.chat_history.append({
-                    "role": "user",
-                    "content": prompt.strip()
-                })
-                st.session_state.chat_history.append({
-                    "role": "assistant",
-                    "content": output_text
-                })
 
-                st.markdown("---")
-                st.subheader("Bonus: Generate Image from AI Output")
-                if st.button("Generate Image from Response", key="imggen"):
-                    with st.spinner("Generating image from text..."):
-                        api_url = "https://api.deepai.org/api/text2img"
-                        api_key = None
-                        if "DEEPAI_API_KEY" in st.secrets:
-                            api_key = st.secrets["DEEPAI_API_KEY"]
-                        elif os.getenv("DEEPAI_API_KEY"):
-                            api_key = os.getenv("DEEPAI_API_KEY")
-                        else:
-                            api_key = "quickstart-QUdJIGlzIGNvbWluZy4uLi4K"
-                        if not api_key or api_key == "quickstart-QUdJIGlzIGNvbWluZy4uLi4K":
-                            st.warning("Using DeepAI demo API key. For best results, add your own DEEPAI_API_KEY to Streamlit secrets.")
-                        try:
-                            r = requests.post(api_url, data={"text": output_text}, headers={"api-key": api_key}, timeout=30)
-                            if r.status_code == 200 and "output_url" in r.json():
-                                st.image(r.json()["output_url"], caption="Generated Image", use_column_width=True)
-                            elif r.status_code == 403:
-                                st.error("DeepAI API key is invalid or quota exceeded. Please set your own DEEPAI_API_KEY in Streamlit secrets.")
-                            elif r.status_code == 429:
-                                st.error("DeepAI API rate limit exceeded. Try again later or use your own API key.")
-                            else:
-                                st.error(f"Image generation failed. Status: {r.status_code}, Response: {r.text}")
-                        except Exception as ex:
-                            st.error(f"Image generation error: {ex}")
+                st.session_state["last_output_text"] = output_text
+                st.session_state["last_prompt"] = prompt.strip()
 
-                st.subheader("Bonus: Listen to AI Response")
-                if st.button("Generate Audio from Response", key="ttsgen"):
-                    with st.spinner("Generating audio..."):
-                        try:
-                            if not output_text.strip():
-                                st.warning("No output text to convert to audio.")
-                            elif len(output_text) > 4000:
-                                st.warning("Text too long for TTS. Please try a shorter response.")
-                            else:
-                                tts = gTTS(output_text)
-                                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
-                                    tts.save(fp.name)
-                                    audio_bytes = fp.read()
-                                with open(fp.name, "rb") as f:
-                                    audio_bytes = f.read()
-                                st.audio(audio_bytes, format="audio/mp3")
-                        except Exception as ex:
-                            st.error(f"Audio generation error: {ex}")
+        except Exception as e:
+            st.error(f"Error: {e}")
+
+if st.session_state.get("last_output_text"):
+    st.markdown("---")
+    st.subheader("Bonus: Generate Image from AI Output")
+    if st.button("Generate Image from Response", key="imggen"):
+        with st.spinner("Generating image from text..."):
+            api_url = "https://api.deepai.org/api/text2img"
+            api_key = None
+            if "DEEPAI_API_KEY" in st.secrets:
+                api_key = st.secrets["DEEPAI_API_KEY"]
+            elif os.getenv("DEEPAI_API_KEY"):
+                api_key = os.getenv("DEEPAI_API_KEY")
+            else:
+                api_key = "quickstart-QUdJIGlzIGNvbWluZy4uLi4K"
+            if not api_key or api_key == "quickstart-QUdJIGlzIGNvbWluZy4uLi4K":
+                st.warning("Using DeepAI demo API key. For best results, add your own DEEPAI_API_KEY to Streamlit secrets.")
+            try:
+                r = requests.post(api_url, data={"text": st.session_state["last_output_text"]}, headers={"api-key": api_key}, timeout=30)
+                if r.status_code == 200 and "output_url" in r.json():
+                    st.image(r.json()["output_url"], caption="Generated Image", use_column_width=True)
+                elif r.status_code == 403:
+                    st.error("DeepAI API key is invalid or quota exceeded. Please set your own DEEPAI_API_KEY in Streamlit secrets.")
+                elif r.status_code == 429:
+                    st.error("DeepAI API rate limit exceeded. Try again later or use your own API key.")
+                else:
+                    st.error(f"Image generation failed. Status: {r.status_code}, Response: {r.text}")
+            except Exception as ex:
+                st.error(f"Image generation error: {ex}")
+
+    st.subheader("Bonus: Listen to AI Response")
+    if st.button("Generate Audio from Response", key="ttsgen"):
+        with st.spinner("Generating audio..."):
+            try:
+                output_text = st.session_state["last_output_text"]
+                if not output_text.strip():
+                    st.warning("No output text to convert to audio.")
+                elif len(output_text) > 4000:
+                    st.warning("Text too long for TTS. Please try a shorter response.")
+                else:
+                    tts = gTTS(output_text)
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+                        tts.save(fp.name)
+                        audio_bytes = fp.read()
+                    with open(fp.name, "rb") as f:
+                        audio_bytes = f.read()
+                    st.audio(audio_bytes, format="audio/mp3")
+            except Exception as ex:
+                st.error(f"Audio generation error: {ex}")
 
         except Exception as e:
             st.error(f"Error: {e}")

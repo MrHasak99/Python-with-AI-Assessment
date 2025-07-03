@@ -18,7 +18,7 @@ genai.configure(api_key=GEMINI_API_KEY)
 
 
 
-st.set_page_config(page_title="Hamad's Python Assessment", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="Gemini AI Playground", page_icon="🤖", layout="wide")
 st.markdown("""
 <style>
 body, .main .block-container, .stApp {
@@ -82,8 +82,8 @@ body, .main .block-container, .stApp {
 
 st.markdown("""
 <div style='display: flex; align-items: center; gap: 1rem;'>
-    <span style='font-size:2.5rem;'>🐍</span>
-    <span style='font-size:2.1rem; font-weight:700; letter-spacing:-1px;'>Hamad's Python Assessment</span>
+    <span style='font-size:2.5rem;'>🤖</span>
+    <span style='font-size:2.1rem; font-weight:700; letter-spacing:-1px;'>Gemini AI Playground</span>
 </div>
 <div style='color:#888; font-size:1.1rem; margin-bottom:0.5rem;'>A robust, multimodal, and interactive Streamlit app for Google Gemini.</div>
 """, unsafe_allow_html=True)
@@ -107,10 +107,9 @@ personas = {
     "Creative Writer": "You are a creative and imaginative writer.",
     "Technical Expert": "You are a technical expert who explains things clearly and concisely.",
     "Witty Historian": "You are a witty historian who adds fun facts and humor.",
+st.sidebar.markdown("---")
     "Friendly Assistant": "You are a friendly and helpful assistant."
 }
-
-st.sidebar.markdown("---")
 st.sidebar.subheader("Custom Persona / Context (Simulated Fine-tuning)")
 custom_persona = st.sidebar.text_area(
     "Add custom instructions, facts, or personality traits for the AI (optional):",

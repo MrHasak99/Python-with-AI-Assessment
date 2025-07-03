@@ -107,7 +107,6 @@ personas = {
     "Creative Writer": "You are a creative and imaginative writer.",
     "Technical Expert": "You are a technical expert who explains things clearly and concisely.",
     "Witty Historian": "You are a witty historian who adds fun facts and humor.",
-st.sidebar.markdown("---")
     "Friendly Assistant": "You are a friendly and helpful assistant."
 }
 st.sidebar.subheader("Custom Persona / Context (Simulated Fine-tuning)")

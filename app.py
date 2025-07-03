@@ -297,10 +297,13 @@ if generate_btn:
                     step_prompt = step_fn(prompt, prev_output)
                     st.info(f"Prompt: {step_prompt}")
                     model = genai.GenerativeModel("models/gemini-2.5-flash")
-                    response = model.generate_content(step_prompt)
-                    step_output = getattr(response, "text", None)
-                    if not step_output:
-                        step_output = "[No valid response returned by Gemini. The output may have been filtered or blocked by the model.]"
+                    try:
+                        response = model.generate_content(step_prompt)
+                        step_output = getattr(response, "text", None) if response else None
+                        if not step_output:
+                            step_output = "[No valid response returned by Gemini. The output may have been filtered, blocked, or the model returned no content.]"
+                    except Exception as ex:
+                        step_output = f"[Gemini API error: {ex}]"
                     with st.expander(f"{label} Output", expanded=(i==len(steps)-1)):
                         st.write(step_output)
                     status.update(label=f"{label} complete.", state="complete")
@@ -345,31 +348,35 @@ if generate_btn:
                         )
                     progress = st.progress(0, text="Streaming Gemini output...")
                     chunk_count = 0
-                    if hasattr(response, "__iter__"):
-                        for chunk in response:
-                            chunk_text = getattr(chunk, "text", None)
-                            if chunk_text:
-                                chunk_count += 1
-                                output_text += chunk_text
+                    if response is not None:
+                        if hasattr(response, "__iter__"):
+                            for chunk in response:
+                                chunk_text = getattr(chunk, "text", None)
+                                if chunk_text:
+                                    chunk_count += 1
+                                    output_text += chunk_text
+                                    output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
+                                    progress.progress(min(chunk_count * 5, 100), text="Streaming Gemini output...")
+                                    time.sleep(0.01)
+                            if not output_text:
+                                output_text = "[No valid response returned by Gemini. The output may have been filtered, blocked, or the model returned no content.]"
                                 output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
-                                progress.progress(min(chunk_count * 5, 100), text="Streaming Gemini output...")
-                                time.sleep(0.01)
-                        if not output_text:
-                            output_text = "[No valid response returned by Gemini. The output may have been filtered or blocked by the model.]"
-                            output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
-                    elif hasattr(response, "text"):
-                        if response.text:
-                            for word in response.text.split():
-                                output_text += word + " "
+                        elif hasattr(response, "text"):
+                            if response.text:
+                                for word in response.text.split():
+                                    output_text += word + " "
+                                    output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
+                                    chunk_count += 1
+                                    progress.progress(min(chunk_count * 2, 100), text="Streaming Gemini output...")
+                                    time.sleep(0.01)
+                            else:
+                                output_text = "[No valid response returned by Gemini. The output may have been filtered, blocked, or the model returned no content.]"
                                 output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
-                                chunk_count += 1
-                                progress.progress(min(chunk_count * 2, 100), text="Streaming Gemini output...")
-                                time.sleep(0.01)
                         else:
-                            output_text = "[No valid response returned by Gemini. The output may have been filtered or blocked by the model.]"
+                            output_text = str(response)
                             output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
                     else:
-                        output_text = str(response)
+                        output_text = "[No response returned by Gemini. The model may have returned no candidates or the request was blocked.]"
                         output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
                     progress.progress(100, text="Streaming complete.")
             except Exception as ex:

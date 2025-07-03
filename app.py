@@ -188,85 +188,79 @@ if generate_btn:
                         steps[min(i+1, len(steps)-1)] = (steps[min(i+1, len(steps)-1)][0], steps[min(i+1, len(steps)-1)][1].replace("[DRAFT]", response.text))
             return outputs[-1]
 
-        try:
-            with st.spinner("Generating response..."):
-                if any(x in prompt.lower() for x in ["multi-step", "chain", "reasoning", "step by step"]):
-                    output_text = multi_step_reasoning(full_prompt)
+        with st.spinner("Generating response..."):
+            if any(x in prompt.lower() for x in ["multi-step", "chain", "reasoning", "step by step"]):
+                output_text = multi_step_reasoning(full_prompt)
+            else:
+                if uploaded_image:
+                    import PIL.Image
+                    from io import BytesIO
+                    image = PIL.Image.open(BytesIO(uploaded_image.read()))
+                    model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+                    multimodal_prompt = full_prompt
+                    if tool_call_result:
+                        multimodal_prompt = f"Weather info: {tool_call_result}\n\n{full_prompt}"
+                    response = model.generate_content(
+                        [multimodal_prompt, image],
+                        generation_config={
+                            "temperature": temperature,
+                            "max_output_tokens": int(max_tokens),
+                        },
+                    )
                 else:
-                    if uploaded_image:
-                        import PIL.Image
-                        from io import BytesIO
-                        image = PIL.Image.open(BytesIO(uploaded_image.read()))
-                        model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
-                        multimodal_prompt = full_prompt
-                        if tool_call_result:
-                            multimodal_prompt = f"Weather info: {tool_call_result}\n\n{full_prompt}"
-                        response = model.generate_content(
-                            [multimodal_prompt, image],
-                            generation_config={
-                                "temperature": temperature,
-                                "max_output_tokens": int(max_tokens),
-                            },
-                        )
+                    model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+                    text_prompt = full_prompt
+                    if tool_call_result:
+                        text_prompt = f"Weather info: {tool_call_result}\n\n{full_prompt}"
+                    response = model.generate_content(
+                        text_prompt,
+                        generation_config={
+                            "temperature": temperature,
+                            "max_output_tokens": int(max_tokens),
+                        },
+                    )
+                output_text = ""
+                if hasattr(response, "text"):
+                    if hasattr(response, "__iter__") and not isinstance(response.text, str):
+                        for chunk in response:
+                            output_text += chunk.text
+                            output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
                     else:
-                        model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
-                        text_prompt = full_prompt
-                        if tool_call_result:
-                            text_prompt = f"Weather info: {tool_call_result}\n\n{full_prompt}"
-                        response = model.generate_content(
-                            text_prompt,
-                            generation_config={
-                                "temperature": temperature,
-                                "max_output_tokens": int(max_tokens),
-                            },
-                        )
-                    output_text = ""
-                    if hasattr(response, "text"):
-                        if hasattr(response, "__iter__") and not isinstance(response.text, str):
-                            for chunk in response:
-                                output_text += chunk.text
-                                output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
-                        else:
-                            for word in response.text.split():
-                                output_text += word + " "
-                                output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
-                    else:
-                        output_text = str(response)
-                        output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
-
-                if any(b in output_text.lower() for b in blacklist):
-                    st.warning("AI output contains blacklisted keywords/phrases. Please review the content.")
-
-                import json
-                displayed = False
-                if any(x in prompt.lower() for x in ["json", "list of", "table", "structured", "dictionary", "summarize", "summary", "extract", "parse"]):
-                    try:
-                        json_start = output_text.find('{')
-                        json_end = output_text.rfind('}') + 1
-                        if json_start != -1 and json_end != -1:
-                            json_str = output_text[json_start:json_end]
-                            parsed = json.loads(json_str)
-                            output_placeholder.json(parsed)
-                            displayed = True
-                    except Exception:
-                        pass
-                if not displayed:
+                        for word in response.text.split():
+                            output_text += word + " "
+                            output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
+                else:
+                    output_text = str(response)
                     output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
 
-                prompt_tokens = max(1, len(full_prompt) // 4)
-                response_tokens = max(1, len(output_text) // 4)
-                total_tokens = prompt_tokens + response_tokens
-                cost_per_1k = 0.000125
-                estimated_cost = (total_tokens / 1000) * cost_per_1k
-                st.info(f"Estimated tokens used: {total_tokens} (Prompt: {prompt_tokens}, Response: {response_tokens})\nEstimated cost: ${estimated_cost:.6f}")
+            if any(b in output_text.lower() for b in blacklist):
+                st.warning("AI output contains blacklisted keywords/phrases. Please review the content.")
 
+            import json
+            displayed = False
+            if any(x in prompt.lower() for x in ["json", "list of", "table", "structured", "dictionary", "summarize", "summary", "extract", "parse"]):
+                try:
+                    json_start = output_text.find('{')
+                    json_end = output_text.rfind('}') + 1
+                    if json_start != -1 and json_end != -1:
+                        json_str = output_text[json_start:json_end]
+                        parsed = json.loads(json_str)
+                        output_placeholder.json(parsed)
+                        displayed = True
+                except Exception:
+                    pass
+            if not displayed:
+                output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
 
-                st.session_state["last_output_text"] = output_text
-                st.session_state["last_prompt"] = prompt.strip()
+            prompt_tokens = max(1, len(full_prompt) // 4)
+            response_tokens = max(1, len(output_text) // 4)
+            total_tokens = prompt_tokens + response_tokens
+            cost_per_1k = 0.000125
+            estimated_cost = (total_tokens / 1000) * cost_per_1k
+            st.info(f"Estimated tokens used: {total_tokens} (Prompt: {prompt_tokens}, Response: {response_tokens})\nEstimated cost: ${estimated_cost:.6f}")
 
-
-
-if st.session_state.get("last_output_text"):
+            st.session_state["last_output_text"] = output_text
+            st.session_state["last_prompt"] = prompt.strip()
     st.markdown("---")
     st.subheader("Bonus: Generate Image from AI Output")
     if st.button("Generate Image from Response", key="imggen"):

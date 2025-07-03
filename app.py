@@ -274,23 +274,46 @@ if generate_btn:
                 if st.button("Generate Image from Response", key="imggen"):
                     with st.spinner("Generating image from text..."):
                         api_url = "https://api.deepai.org/api/text2img"
-                        api_key = st.secrets.get("DEEPAI_API_KEY", os.getenv("DEEPAI_API_KEY", "quickstart-QUdJIGlzIGNvbWluZy4uLi4K"))
-                        r = requests.post(api_url, data={"text": output_text}, headers={"api-key": api_key})
-                        if r.status_code == 200 and "output_url" in r.json():
-                            st.image(r.json()["output_url"], caption="Generated Image", use_column_width=True)
+                        api_key = None
+                        if "DEEPAI_API_KEY" in st.secrets:
+                            api_key = st.secrets["DEEPAI_API_KEY"]
+                        elif os.getenv("DEEPAI_API_KEY"):
+                            api_key = os.getenv("DEEPAI_API_KEY")
                         else:
-                            st.error("Image generation failed.")
+                            api_key = "quickstart-QUdJIGlzIGNvbWluZy4uLi4K"
+                        if not api_key or api_key == "quickstart-QUdJIGlzIGNvbWluZy4uLi4K":
+                            st.warning("Using DeepAI demo API key. For best results, add your own DEEPAI_API_KEY to Streamlit secrets.")
+                        try:
+                            r = requests.post(api_url, data={"text": output_text}, headers={"api-key": api_key}, timeout=30)
+                            if r.status_code == 200 and "output_url" in r.json():
+                                st.image(r.json()["output_url"], caption="Generated Image", use_column_width=True)
+                            elif r.status_code == 403:
+                                st.error("DeepAI API key is invalid or quota exceeded. Please set your own DEEPAI_API_KEY in Streamlit secrets.")
+                            elif r.status_code == 429:
+                                st.error("DeepAI API rate limit exceeded. Try again later or use your own API key.")
+                            else:
+                                st.error(f"Image generation failed. Status: {r.status_code}, Response: {r.text}")
+                        except Exception as ex:
+                            st.error(f"Image generation error: {ex}")
 
                 st.subheader("Bonus: Listen to AI Response")
                 if st.button("Generate Audio from Response", key="ttsgen"):
                     with st.spinner("Generating audio..."):
-                        tts = gTTS(output_text)
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
-                            tts.save(fp.name)
-                            audio_bytes = fp.read()
-                        with open(fp.name, "rb") as f:
-                            audio_bytes = f.read()
-                        st.audio(audio_bytes, format="audio/mp3")
+                        try:
+                            if not output_text.strip():
+                                st.warning("No output text to convert to audio.")
+                            elif len(output_text) > 4000:
+                                st.warning("Text too long for TTS. Please try a shorter response.")
+                            else:
+                                tts = gTTS(output_text)
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+                                    tts.save(fp.name)
+                                    audio_bytes = fp.read()
+                                with open(fp.name, "rb") as f:
+                                    audio_bytes = f.read()
+                                st.audio(audio_bytes, format="audio/mp3")
+                        except Exception as ex:
+                            st.error(f"Audio generation error: {ex}")
 
         except Exception as e:
             st.error(f"Error: {e}")

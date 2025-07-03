@@ -17,13 +17,76 @@ genai.configure(api_key=GEMINI_API_KEY)
 
 
 
-st.set_page_config(page_title="Gemini Text Generation Demo", page_icon="🤖")
-st.title("🤖 Gemini Text Generation Demo")
+
+st.set_page_config(page_title="Gemini AI Playground", page_icon="🤖", layout="wide")
 st.markdown("""
-Welcome! Enter a prompt and let Google's Gemini model generate a response.  
-**Temperature** controls creativity (lower = more focused, higher = more creative).  
-**Max Output Tokens** controls the length of the response.
-""")
+<style>
+body, .main .block-container {background: #f7f8fa;}
+.stApp {background: #f7f8fa;}
+.st-emotion-cache-1kyxreq, .st-emotion-cache-1v0mbdj, .st-emotion-cache-1avcm0n {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+}
+.stTextArea textarea {
+    background: #fffbe7;
+    border-radius: 8px;
+    border: 1.5px solid #ffe082;
+    font-size: 1.1rem;
+}
+.stButton>button {
+    background: linear-gradient(90deg, #ffd600 0%, #ffb300 100%);
+    color: #222;
+    border-radius: 8px;
+    font-weight: 600;
+    border: none;
+    box-shadow: 0 2px 8px #ffe08244;
+    transition: 0.2s;
+}
+.stButton>button:hover {
+    background: linear-gradient(90deg, #ffb300 0%, #ffd600 100%);
+    color: #111;
+}
+.stDataFrame, .stDataFrame table {
+    background: #fff;
+    border-radius: 8px;
+    font-size: 1.05rem;
+}
+.stExpanderHeader {
+    font-weight: 600;
+    color: #ff9100;
+}
+.stMarkdown h2, .stMarkdown h3, .stMarkdown h4 {
+    color: #ff9100;
+}
+.stMarkdown code {
+    background: #fffde7;
+    color: #d84315;
+    border-radius: 4px;
+    padding: 2px 6px;
+}
+.stStatus, .stInfo, .stSuccess, .stWarning {
+    border-radius: 8px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div style='display: flex; align-items: center; gap: 1rem;'>
+    <span style='font-size:2.5rem;'>🤖</span>
+    <span style='font-size:2.1rem; font-weight:700; letter-spacing:-1px;'>Gemini AI Playground</span>
+</div>
+<div style='color:#888; font-size:1.1rem; margin-bottom:0.5rem;'>A robust, multimodal, and interactive Streamlit app for Google Gemini.</div>
+""", unsafe_allow_html=True)
+
+with st.expander("ℹ️ How to use this app", expanded=False):
+    st.markdown("""
+    - **Enter a prompt** and select a persona or template to guide the AI.
+    - **Upload images** for multimodal input, or a knowledge base for RAG.
+    - **Use the sidebar** for advanced controls, moderation, and bonus features.
+    - **Interact with CSV data** in the Structured Data Q&A section.
+    - **Bonus:** Generate images or audio from AI output!
+    """)
 
 prompt_templates = {
     "Write a short story": "Write a short story about a robot who learns to love.",
@@ -94,10 +157,14 @@ if kb_file:
     st.sidebar.success("Knowledge base loaded.")
     st.sidebar.info(f"Loaded {len(kb_text)} characters.")
 
-prompt = st.text_area("Enter your prompt:", value=default_prompt, height=120, key="main_prompt")
-temperature = st.slider("Temperature (creativity)", min_value=0.0, max_value=1.0, value=0.5, step=0.05, help="Higher values = more creative, lower = more focused.")
-max_tokens = st.number_input("Max Output Tokens", min_value=50, max_value=2048, value=512, step=10)
-generate_btn = st.button("Generate")
+with st.container():
+    colA, colB = st.columns([3, 1])
+    with colA:
+        prompt = st.text_area("💬 Enter your prompt:", value=default_prompt, height=120, key="main_prompt")
+    with colB:
+        temperature = st.slider("Temperature", min_value=0.0, max_value=1.0, value=0.5, step=0.05, help="Higher = more creative")
+        max_tokens = st.number_input("Max Tokens", min_value=50, max_value=2048, value=512, step=10)
+        generate_btn = st.button("🚀 Generate", use_container_width=True)
 
 output_placeholder = st.empty()
 
@@ -109,6 +176,52 @@ if csv_file:
     df = pd.read_csv(csv_file)
     st.sidebar.success(f"CSV loaded: {df.shape[0]} rows, {df.shape[1]} columns.")
     st.sidebar.dataframe(df.head())
+
+if df is not None:
+    st.markdown("---")
+    with st.expander("📊 Structured Data Q&A (CSV)", expanded=False):
+        st.write("Interact with your uploaded CSV data using filters or natural language queries.")
+        col1, col2 = st.columns(2)
+        with col1:
+            selected_col = st.selectbox("Select column to filter", [None] + list(df.columns), key="csv_col")
+        with col2:
+            filter_value = st.text_input("Filter value (optional)", key="csv_filter")
+
+        nl_query = st.text_input("Ask a question about the data (natural language)", key="csv_nlq")
+        run_data_query = st.button("Run Data Query", key="csv_run")
+
+        filtered_df = df
+        if selected_col and filter_value:
+            filtered_df = df[df[selected_col].astype(str).str.contains(filter_value, case=False, na=False)]
+            st.info(f"Filtered by {selected_col} contains '{filter_value}' ({filtered_df.shape[0]} rows)")
+        st.dataframe(filtered_df.head(20), use_container_width=True)
+
+        if run_data_query and nl_query.strip():
+            st.markdown("---")
+            st.subheader("AI Data Q&A")
+            st.info(f"Question: {nl_query}")
+            code_prompt = (
+                f"You are a Python data analyst. Given the following DataFrame columns: {list(df.columns)}. "
+                f"Write a Pandas code snippet (no explanation, just code) to answer: '{nl_query}'. "
+                f"Assume the DataFrame is named 'df'. Limit output to 20 rows."
+            )
+            model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+            response = model.generate_content(code_prompt)
+            code = response.text.strip()
+            import re
+            code_match = re.search(r'```(?:python)?\n([\s\S]+?)```', code)
+            if code_match:
+                code = code_match.group(1)
+            st.code(code, language="python")
+            try:
+                allowed_builtins = {'df': df, 'pd': pd}
+                result = eval(code, {"__builtins__": {}}, allowed_builtins)
+                if isinstance(result, pd.DataFrame):
+                    st.dataframe(result.head(20), use_container_width=True)
+                else:
+                    st.write(result)
+            except Exception as ex:
+                st.error(f"Could not execute generated code: {ex}")
 
 
 def get_weather(city: str):
@@ -158,34 +271,39 @@ if generate_btn:
         match = weather_pattern.search(prompt)
         if match:
             tool_call_city = match.group(1).strip()
-            tool_call_result = get_weather(tool_call_city)
             with st.status("AI is trying to fetch weather data...", expanded=True) as status:
                 st.info(f"Tool call: get_weather('{tool_call_city}')")
+                tool_call_result = get_weather(tool_call_city)
                 st.success(f"Result: {tool_call_result}")
                 status.update(label="Weather data fetched.", state="complete")
 
         def multi_step_reasoning(prompt):
             steps = [
-                ("Step 1: Analyze intent", f"Analyze the following user request and break it into steps: {prompt}"),
-                ("Step 2: Generate initial draft", f"Write a draft response for: {prompt}"),
-                ("Step 3: Refine output", f"Improve and clarify the following draft: [DRAFT]"),
+                ("Step 1: Analyze intent", lambda p, _: f"Analyze the following user request and break it into logical steps: {p}"),
+                ("Step 2: Generate initial draft", lambda p, prev: f"Write a detailed draft response for the following user request, using this plan: {prev}"),
+                ("Step 3: Refine output", lambda p, prev: f"Refine and clarify the following draft for the user request '{p}':\n{prev}"),
             ]
             outputs = []
-            for i, (label, step_prompt) in enumerate(steps):
-                with st.expander(label, expanded=(i==0)):
+            prev_output = None
+            for i, (label, step_fn) in enumerate(steps):
+                with st.status(f"{label}...", expanded=True) as status:
+                    step_prompt = step_fn(prompt, prev_output)
                     st.info(f"Prompt: {step_prompt}")
                     model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
                     response = model.generate_content(step_prompt)
-                    st.success(response.text)
-                    outputs.append(response.text)
-                    if "[DRAFT]" in steps[min(i+1, len(steps)-1)][1]:
-                        steps[min(i+1, len(steps)-1)] = (steps[min(i+1, len(steps)-1)][0], steps[min(i+1, len(steps)-1)][1].replace("[DRAFT]", response.text))
+                    step_output = response.text
+                    with st.expander(f"{label} Output", expanded=(i==len(steps)-1)):
+                        st.write(step_output)
+                    status.update(label=f"{label} complete.", state="complete")
+                    outputs.append(step_output)
+                    prev_output = step_output
             return outputs[-1]
 
         with st.spinner("Generating response..."):
             if any(x in prompt.lower() for x in ["multi-step", "chain", "reasoning", "step by step"]):
                 output_text = multi_step_reasoning(full_prompt)
             else:
+                import time
                 if uploaded_image:
                     import PIL.Image
                     from io import BytesIO
@@ -212,26 +330,36 @@ if generate_btn:
                             "temperature": temperature,
                             "max_output_tokens": int(max_tokens),
                         },
+                        stream=True
                     )
                 output_text = ""
-                if hasattr(response, "text"):
-                    if hasattr(response, "__iter__") and not isinstance(response.text, str):
-                        for chunk in response:
-                            output_text += chunk.text
-                            output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
-                    else:
-                        for word in response.text.split():
-                            output_text += word + " "
-                            output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
+                progress = st.progress(0, text="Streaming Gemini output...")
+                chunk_count = 0
+                if hasattr(response, "__iter__"):
+                    for chunk in response:
+                        chunk_count += 1
+                        output_text += getattr(chunk, "text", str(chunk))
+                        output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
+                        progress.progress(min(chunk_count * 5, 100), text="Streaming Gemini output...")
+                        time.sleep(0.01)
+                elif hasattr(response, "text"):
+                    for word in response.text.split():
+                        output_text += word + " "
+                        output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
+                        chunk_count += 1
+                        progress.progress(min(chunk_count * 2, 100), text="Streaming Gemini output...")
+                        time.sleep(0.01)
                 else:
                     output_text = str(response)
                     output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
+                progress.progress(100, text="Streaming complete.")
 
             if any(b in output_text.lower() for b in blacklist):
                 st.warning("AI output contains blacklisted keywords/phrases. Please review the content.")
 
             import json
             displayed = False
+            # JSON
             if any(x in prompt.lower() for x in ["json", "list of", "table", "structured", "dictionary", "summarize", "summary", "extract", "parse"]):
                 try:
                     json_start = output_text.find('{')
@@ -243,6 +371,12 @@ if generate_btn:
                         displayed = True
                 except Exception:
                     pass
+            if not displayed and '|' in output_text and output_text.count('|') > 2:
+                import re
+                table_match = re.search(r'(\|.+\|\n\|[\s\S]+?\|\n)', output_text)
+                if table_match:
+                    st.markdown(table_match.group(1))
+                    displayed = True
             if not displayed:
                 output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
 

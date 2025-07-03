@@ -261,6 +261,9 @@ if generate_btn:
 
             st.session_state["last_output_text"] = output_text
             st.session_state["last_prompt"] = prompt.strip()
+    st.session_state["show_bonus_buttons"] = True
+
+if st.session_state.get("show_bonus_buttons"):
     st.markdown("---")
     st.subheader("Bonus: Generate Image from AI Output")
     if st.button("Generate Image from Response", key="imggen"):
@@ -301,7 +304,6 @@ if generate_btn:
                     tts = gTTS(output_text)
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
                         tts.save(fp.name)
-                        audio_bytes = fp.read()
                     with open(fp.name, "rb") as f:
                         audio_bytes = f.read()
                     st.audio(audio_bytes, format="audio/mp3")

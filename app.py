@@ -392,7 +392,12 @@ if generate_btn:
             total_tokens = prompt_tokens + response_tokens
             cost_per_1k = 0.000125
             estimated_cost = (total_tokens / 1000) * cost_per_1k
-            st.info(f"Estimated tokens used: {total_tokens} (Prompt: {prompt_tokens}, Response: {response_tokens})\nEstimated cost: ${estimated_cost:.6f}")
+            st.markdown(f"""
+<div style='background:#fffde7; color:#d84315; border-radius:8px; padding:10px 16px; font-size:1.08rem; border:1.5px solid #ffe082; margin-bottom:0.5rem;'>
+<b>Estimated tokens used:</b> {total_tokens} <span style='color:#888;'>(Prompt: {prompt_tokens}, Response: {response_tokens})</span><br>
+<b>Estimated cost:</b> ${estimated_cost:.6f}
+</div>
+""", unsafe_allow_html=True)
 
             st.session_state["last_output_text"] = output_text
             st.session_state["last_prompt"] = prompt.strip()

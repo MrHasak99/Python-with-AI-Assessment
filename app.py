@@ -296,7 +296,7 @@ if generate_btn:
                 with st.status(f"{label}...", expanded=True) as status:
                     step_prompt = step_fn(prompt, prev_output)
                     st.info(f"Prompt: {step_prompt}")
-                    model = genai.GenerativeModel("models/gemini-2.5-flash-lite")
+                    model = genai.GenerativeModel("models/gemini-2.5-flash")
                     response = model.generate_content(step_prompt)
                     step_output = response.text
                     with st.expander(f"{label} Output", expanded=(i==len(steps)-1)):
@@ -317,7 +317,7 @@ if generate_btn:
                         import PIL.Image
                         from io import BytesIO
                         image = PIL.Image.open(BytesIO(uploaded_image.read()))
-                        model = genai.GenerativeModel("models/gemini-2.5-flash-lite")
+                        model = genai.GenerativeModel("models/gemini-2.5-flash")
                         multimodal_prompt = full_prompt
                         if tool_call_result:
                             multimodal_prompt = f"Weather info: {tool_call_result}\n\n{full_prompt}"
@@ -329,7 +329,7 @@ if generate_btn:
                             },
                         )
                     else:
-                        model = genai.GenerativeModel("models/gemini-2.5-flash-lite")
+                        model = genai.GenerativeModel("models/gemini-2.5-flash")
                         text_prompt = full_prompt
                         if tool_call_result:
                             text_prompt = f"Weather info: {tool_call_result}\n\n{full_prompt}"

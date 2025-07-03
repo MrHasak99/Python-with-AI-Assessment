@@ -309,6 +309,7 @@ if generate_btn:
             return outputs[-1]
 
         with st.spinner("Generating response..."):
+            output_text = ""
             try:
                 if any(x in prompt.lower() for x in ["multi-step", "chain", "reasoning", "step by step"]):
                     output_text = multi_step_reasoning(full_prompt)
@@ -342,7 +343,6 @@ if generate_btn:
                             },
                             stream=True
                         )
-                    output_text = ""
                     progress = st.progress(0, text="Streaming Gemini output...")
                     chunk_count = 0
                     if hasattr(response, "__iter__"):

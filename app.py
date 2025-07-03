@@ -454,10 +454,12 @@ if st.session_state.get("show_bonus_buttons"):
                 "Content-Type": "application/json"
             }
             prompt_text = st.session_state.get("last_output_text", "AI generated image")
-            import string
+            import string, re
             cleaned = prompt_text.strip()
+            cleaned = re.sub(r'[\r\n\t]+', ' ', cleaned)
+            cleaned = re.sub(r'\s+', ' ', cleaned)
             cleaned_no_punct = cleaned.translate(str.maketrans('', '', string.punctuation)).replace(' ', '')
-            if not cleaned or len(cleaned) < 5 or not cleaned_no_punct or len(cleaned_no_punct) < 3:
+            if not cleaned or len(cleaned) < 5 or not cleaned_no_punct or len(cleaned_no_punct) < 3 or len(cleaned) > 2000:
                 prompt_text = "AI generated image"
             else:
                 prompt_text = cleaned[:2000]

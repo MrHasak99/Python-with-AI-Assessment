@@ -1,204 +1,189 @@
-import streamlit as st
 import os
-import time
-import json
-from PIL import Image
-import io
+import streamlit as st
+import google.generativeai as genai
 
-try:
-    import google.generativeai as genai
-except ImportError:
-    st.error("google-generativeai is not installed. Please install it with 'pip install google-generativeai'.")
 
-API_KEY = os.getenv("GOOGLE_API_KEY") or st.secrets.get("GOOGLE_API_KEY", None)
-if API_KEY:
-    genai.configure(api_key=API_KEY)
-else:
-    st.error("Google API Key not found. Please set the GOOGLE_API_KEY as an environment variable or in Streamlit secrets.")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", st.secrets["GEMINI_API_KEY"] if "GEMINI_API_KEY" in st.secrets else None)
+if not GEMINI_API_KEY:
+    st.error("Gemini API key not found. Please set GEMINI_API_KEY as an environment variable or in Streamlit secrets.")
+    st.stop()
+genai.configure(api_key=GEMINI_API_KEY)
 
-def get_weather(city):
-    weather_data = {
-        "London": {"temp": 20, "condition": "Cloudy"},
-        "Paris": {"temp": 25, "condition": "Sunny"},
-        "New York": {"temp": 28, "condition": "Rainy"},
-    }
-    return weather_data.get(city, {"temp": "N/A", "condition": "Unknown"})
 
-def gemini_respond(user_input):
-    if "weather" in user_input.lower():
-        city = None
-        for c in ["London", "Paris", "New York"]:
-            if c.lower() in user_input.lower():
-                city = c
-                break
-        if city:
-            yield {"type": "function_call", "content": f"AI is trying to fetch weather data for {city}..."}
-            weather = get_weather(city)
-            yield {"type": "function_result", "content": weather}
-            response = f"The current weather in {city} is {weather['temp']}°C and {weather['condition']}. Let me know if you need more details!"
-            for word in response.split():
-                yield {"type": "stream", "content": word + " "}
-                time.sleep(0.07)
-            yield {"type": "done"}
-            return
-    if "show me a table" in user_input.lower():
-        table_md = """| City      | Temp (°C) | Condition |
-|-----------|-----------|-----------|
-| London    | 20        | Cloudy    |
-| Paris     | 25        | Sunny     |
-| New York  | 28        | Rainy     |"""
-        yield {"type": "structured", "content": table_md}
-        yield {"type": "done"}
-        return
-    response = "I'm not sure how to help with that, but I can answer questions about the weather in London, Paris, or New York."
-    for word in response.split():
-        yield {"type": "stream", "content": word + " "}
-        time.sleep(0.07)
-    yield {"type": "done"}
 
-def estimate_token_usage(text):
-    return max(1, len(text) // 4)
+st.set_page_config(page_title="Gemini Text Generation Demo", page_icon="🤖")
+st.title("🤖 Gemini Text Generation Demo")
+st.markdown("""
+Welcome! Enter a prompt and let Google's Gemini model generate a response.  
+**Temperature** controls creativity (lower = more focused, higher = more creative).  
+**Max Output Tokens** controls the length of the response.
+""")
 
-personas = {
-    "Creative Writer": "You are a creative writer. Your responses should be imaginative and engaging.",
-    "Technical Expert": "You are a technical expert. Your responses should be accurate and informative.",
-    "Witty Historian": "You are a witty historian. Your responses should be insightful and entertaining, with a touch of humor.",
-    "Neutral": ""
-}
 prompt_templates = {
-    "Select a template": "",
-    "Write a short story about...": "Write a short story about ",
-    "Generate a poem about...": "Generate a poem about ",
-    "Explain this concept:": "Explain this concept in simple terms: ",
-    "Translate to French:": "Translate the following to French: "
+    "Write a short story": "Write a short story about a robot who learns to love.",
+    "Generate a poem": "Generate a poem about the beauty of the night sky.",
+    "Summarize text": "Summarize the following text:",
+    "Explain a concept": "Explain the concept of quantum computing in simple terms.",
+}
+personas = {
+    "Creative Writer": "You are a creative and imaginative writer.",
+    "Technical Expert": "You are a technical expert who explains things clearly and concisely.",
+    "Witty Historian": "You are a witty historian who adds fun facts and humor.",
+    "Friendly Assistant": "You are a friendly and helpful assistant.",
 }
 
-def main():
-    st.set_page_config(page_title="Gemini All-in-One Streamlit Demo", layout="wide")
+st.sidebar.header("AI Controls")
+template_choice = st.sidebar.selectbox("Choose a prompt template", ["(None)"] + list(prompt_templates.keys()))
+persona_choice = st.sidebar.radio("Choose an AI persona", list(personas.keys()), index=0)
 
-    with st.sidebar:
-        st.title("Gemini AI Demo")
-        st.info("Try asking: 'What's the weather in Paris?' or 'Show me a table of weather.'")
-        st.markdown("---")
-        st.write("**Resource Usage Awareness**")
-        st.write("Token usage and cost will be shown after each response.")
 
-    st.title("🌟 Gemini All-in-One Streamlit Demo")
+st.sidebar.markdown("---")
+st.sidebar.subheader("Multimodal Input (Optional)")
+uploaded_image = st.sidebar.file_uploader("Upload an image (JPG, PNG)", type=["jpg", "jpeg", "png"])
+if uploaded_image:
+    st.image(uploaded_image, caption="Uploaded Image", use_container_width=True)
 
-    with st.expander("About this app", expanded=False):
-        st.markdown("""
-        - **Stage 1:** Basic text generation with temperature and token controls.
-        - **Stage 2:** Prompt templates, personas, chat history, and multimodal (image) input.
-        - **Stage 3:** Function calling, structured output, streaming, and resource usage display.
-        """)
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-    if 'chat_history' not in st.session_state:
-        st.session_state.chat_history = []
+st.sidebar.markdown("---")
+st.sidebar.subheader("Custom Moderation")
+blacklist_input = st.sidebar.text_area(
+    "Blacklisted keywords/phrases (comma-separated)",
+    value=st.session_state.get("blacklist", ""),
+    help="Any prompt or output containing these will be flagged."
+)
+if st.sidebar.button("Save Blacklist"):
+    st.session_state["blacklist"] = blacklist_input
+    st.sidebar.success("Blacklist updated.")
+blacklist = [w.strip().lower() for w in st.session_state.get("blacklist", "").split(",") if w.strip()]
 
-    colA, colB = st.columns([2,1])
-    with colA:
-        selected_persona_name = st.selectbox("Choose a Persona:", list(personas.keys()), key="persona")
-        system_instruction = personas[selected_persona_name]
+if template_choice != "(None)":
+    default_prompt = prompt_templates[template_choice]
+else:
+    default_prompt = ""
 
-        selected_template = st.selectbox("Use a Prompt Template:", list(prompt_templates.keys()), key="template")
-        user_input = st.text_area("Enter your prompt:", value=prompt_templates[selected_template], height=120, key="main_prompt")
+prompt = st.text_area("Enter your prompt:", value=default_prompt, height=120, key="main_prompt")
+temperature = st.slider("Temperature (creativity)", min_value=0.0, max_value=1.0, value=0.5, step=0.05, help="Higher values = more creative, lower = more focused.")
+max_tokens = st.number_input("Max Output Tokens", min_value=50, max_value=2048, value=512, step=10)
+generate_btn = st.button("Generate")
 
-        uploaded_file = st.file_uploader("Upload an image (optional):", type=["jpg", "jpeg", "png"])
-        image = None
-        if uploaded_file is not None:
-            image = Image.open(uploaded_file)
-            st.image(image, caption="Uploaded Image", use_container_width=True)
+st.markdown("---")
+st.subheader("Conversation History")
+for msg in st.session_state.chat_history:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-        temperature = st.slider("Temperature", 0.0, 1.0, 0.7, 0.01)
-        st.info("Controls the randomness of the output. Higher values result in more creative and diverse text.")
+output_placeholder = st.empty()
 
-        max_output_tokens = st.number_input("Max Output Tokens", 50, 2048, 500, 1)
-        st.info("Sets the maximum number of tokens (words or word pieces) in the generated output.")
 
-        if st.button("Generate", key="generate"):
-            if not user_input and image is None:
-                st.warning("Please enter a prompt or upload an image.")
-            else:
-                content = []
-                if system_instruction:
-                    content.append({"role": "user", "parts": [{"text": system_instruction}]})
-                    content.append({"role": "model", "parts": [{"text": "Okay, I understand."}]})
-                for message in st.session_state.chat_history:
-                    content.append({"role": message["role"], "parts": message["parts"]})
-                img_byte_arr = None
-                if image:
-                    img_byte_arr = io.BytesIO()
-                    image.save(img_byte_arr, format="PNG")
-                    img_byte_arr = img_byte_arr.getvalue()
-                    content.append({"role": "user", "parts": [{"mime_type": "image/png", "data": img_byte_arr}, {"text": user_input}]})
-                elif user_input:
-                    content.append({"role": "user", "parts": [{"text": user_input}]})
+def get_weather(city: str):
+    weather_db = {
+        "london": "Cloudy, 18°C",
+        "new york": "Sunny, 25°C",
+        "paris": "Rainy, 16°C",
+        "tokyo": "Clear, 22°C",
+    }
+    return weather_db.get(city.lower(), f"Weather data for {city} is not available.")
 
-                with st.spinner("Gemini is thinking..."):
-                    if not image and ("weather" in user_input.lower() or "show me a table" in user_input.lower()):
-                        container = st.empty()
-                        stream_text = ""
-                        for chunk in gemini_respond(user_input):
-                            if chunk["type"] == "function_call":
-                                container.info(chunk["content"])
-                            elif chunk["type"] == "function_result":
-                                container.success(f"Weather data: {chunk['content']}")
-                            elif chunk["type"] == "structured":
-                                container.markdown(chunk["content"])
-                            elif chunk["type"] == "stream":
-                                stream_text += chunk["content"]
-                                container.markdown(stream_text)
-                            elif chunk["type"] == "done":
-                                break
-                        st.session_state.chat_history.append({"role": "user", "parts": [{"text": user_input}]})
-                        st.session_state.chat_history.append({"role": "model", "parts": [{"text": stream_text if stream_text else "(see above)"}]})
+if generate_btn:
+    if not prompt.strip():
+        st.warning("Please enter a prompt before generating.")
+    elif any(b in prompt.lower() for b in blacklist):
+        st.error("Your prompt contains blacklisted keywords/phrases. Please revise your input.")
+    else:
+        persona_instruction = personas[persona_choice]
+        full_prompt = f"{persona_instruction}\n\n{prompt.strip()}"
+
+        tool_call_result = None
+        tool_call_city = None
+        import re
+        weather_pattern = re.compile(r"weather in ([a-zA-Z ]+)", re.IGNORECASE)
+        match = weather_pattern.search(prompt)
+        if match:
+            tool_call_city = match.group(1).strip()
+            tool_call_result = get_weather(tool_call_city)
+            with st.status("AI is trying to fetch weather data...", expanded=True) as status:
+                st.info(f"Tool call: get_weather('{tool_call_city}')")
+                st.success(f"Result: {tool_call_result}")
+                status.update(label="Weather data fetched.", state="complete")
+
+        try:
+            with st.spinner("Generating response..."):
+                if uploaded_image:
+                    import PIL.Image
+                    from io import BytesIO
+                    image = PIL.Image.open(BytesIO(uploaded_image.read()))
+                    model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+                    multimodal_prompt = full_prompt
+                    if tool_call_result:
+                        multimodal_prompt = f"Weather info: {tool_call_result}\n\n{full_prompt}"
+                    response = model.generate_content(
+                        [multimodal_prompt, image],
+                        generation_config={
+                            "temperature": temperature,
+                            "max_output_tokens": int(max_tokens),
+                        },
+                    )
+                else:
+                    model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+                    text_prompt = full_prompt
+                    if tool_call_result:
+                        text_prompt = f"Weather info: {tool_call_result}\n\n{full_prompt}"
+                    response = model.generate_content(
+                        text_prompt,
+                        generation_config={
+                            "temperature": temperature,
+                            "max_output_tokens": int(max_tokens),
+                        },
+                    )
+                output_text = ""
+                if hasattr(response, "text"):
+                    if hasattr(response, "__iter__") and not isinstance(response.text, str):
+                        for chunk in response:
+                            output_text += chunk.text
+                            output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
                     else:
-                        try:
-                            model_name = 'models/gemini-1.5-flash-latest'
-                            model = genai.GenerativeModel(model_name)
-                            response = model.generate_content(
-                                content,
-                                generation_config=genai.GenerationConfig(
-                                    temperature=temperature,
-                                    max_output_tokens=max_output_tokens,
-                                ),
-                            )
-                            if response.prompt_feedback and response.prompt_feedback.safety_ratings and any(rating.blocked for rating in response.prompt_feedback.safety_ratings):
-                                st.warning("Content generation was blocked due to safety concerns. Please try a different prompt or image.")
-                            elif response.candidates and response.candidates[0].finish_reason == 2:
-                                st.warning("Content generation stopped prematurely due to safety concerns. Please try a different prompt or image.")
-                            elif response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-                                if image:
-                                    st.session_state.chat_history.append({"role": "user", "parts": [{"mime_type": "image/png", "data": img_byte_arr}, {"text": user_input}]})
-                                elif user_input:
-                                    st.session_state.chat_history.append({"role": "user", "parts": [{"text": user_input}]})
-                                st.session_state.chat_history.append({"role": "model", "parts": response.candidates[0].content.parts})
-                                output_text = "".join([p.text for p in response.candidates[0].content.parts if hasattr(p, 'text')])
-                                container = st.empty()
-                                stream_text = ""
-                                for word in output_text.split():
-                                    stream_text += word + " "
-                                    container.markdown(stream_text)
-                                    time.sleep(0.04)
-                            else:
-                                st.warning("Content generation failed to return a valid response.")
-                        except Exception as e:
-                            st.error(f"An error occurred: {e}")
+                        for word in response.text.split():
+                            output_text += word + " "
+                            output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
+                else:
+                    output_text = str(response)
+                    output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
 
-    with colB:
-        st.markdown("**Resource Usage**")
-        tokens = estimate_token_usage(user_input)
-        st.json({"Estimated tokens": tokens, "Estimated cost (USD)": f"${tokens*0.0001:.4f}"})
-        st.markdown("---")
-        st.markdown("**Chat History**")
-        for message in st.session_state.chat_history[::-1]:
-            role = "user" if message["role"] == "user" else "assistant"
-            with st.chat_message(role):
-                for part in message["parts"]:
-                    if isinstance(part, dict) and "text" in part:
-                        st.markdown(part["text"])
-                    elif hasattr(part, 'text'):
-                        st.markdown(part.text)
+                if any(b in output_text.lower() for b in blacklist):
+                    st.warning("AI output contains blacklisted keywords/phrases. Please review the content.")
 
-if __name__ == "__main__":
-    main()
+                import json
+                displayed = False
+                if any(x in prompt.lower() for x in ["json", "list of", "table", "structured", "dictionary", "summarize", "summary", "extract", "parse"]):
+                    try:
+                        json_start = output_text.find('{')
+                        json_end = output_text.rfind('}') + 1
+                        if json_start != -1 and json_end != -1:
+                            json_str = output_text[json_start:json_end]
+                            parsed = json.loads(json_str)
+                            output_placeholder.json(parsed)
+                            displayed = True
+                    except Exception:
+                        pass
+                if not displayed:
+                    output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
+
+                prompt_tokens = max(1, len(full_prompt) // 4)
+                response_tokens = max(1, len(output_text) // 4)
+                total_tokens = prompt_tokens + response_tokens
+                cost_per_1k = 0.000125
+                estimated_cost = (total_tokens / 1000) * cost_per_1k
+                st.info(f"Estimated tokens used: {total_tokens} (Prompt: {prompt_tokens}, Response: {response_tokens})\nEstimated cost: ${estimated_cost:.6f}")
+
+                st.session_state.chat_history.append({
+                    "role": "user",
+                    "content": prompt.strip()
+                })
+                st.session_state.chat_history.append({
+                    "role": "assistant",
+                    "content": output_text
+                })
+        except Exception as e:
+            st.error(f"Error: {e}")

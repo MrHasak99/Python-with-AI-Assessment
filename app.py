@@ -21,8 +21,16 @@ genai.configure(api_key=GEMINI_API_KEY)
 st.set_page_config(page_title="Gemini AI Playground", page_icon="🤖", layout="wide")
 st.markdown("""
 <style>
-body, .main .block-container {background: #f7f8fa;}
-.stApp {background: #f7f8fa;}
+body, .main .block-container, .stApp {
+    background: #fff !important;
+    color: #222 !important;
+}
+.stMarkdown, .stMarkdown * {
+    color: #222 !important;
+}
+.stMarkdown h2, .stMarkdown h3, .stMarkdown h4 {
+    color: #ff9100 !important;
+}
 .st-emotion-cache-1kyxreq, .st-emotion-cache-1v0mbdj, .st-emotion-cache-1avcm0n {
     padding-top: 0.5rem !important;
     padding-bottom: 0.5rem !important;
@@ -33,6 +41,7 @@ body, .main .block-container {background: #f7f8fa;}
     border-radius: 8px;
     border: 1.5px solid #ffe082;
     font-size: 1.1rem;
+    color: #222;
 }
 .stButton>button {
     background: linear-gradient(90deg, #ffd600 0%, #ffb300 100%);
@@ -51,17 +60,15 @@ body, .main .block-container {background: #f7f8fa;}
     background: #fff;
     border-radius: 8px;
     font-size: 1.05rem;
+    color: #222;
 }
 .stExpanderHeader {
     font-weight: 600;
     color: #ff9100;
 }
-.stMarkdown h2, .stMarkdown h3, .stMarkdown h4 {
-    color: #ff9100;
-}
 .stMarkdown code {
     background: #fffde7;
-    color: #d84315;
+    color: #d84315 !important;
     border-radius: 4px;
     padding: 2px 6px;
 }

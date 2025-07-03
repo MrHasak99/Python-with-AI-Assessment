@@ -386,7 +386,11 @@ if generate_btn:
                                 output_text = str(response)
                                 output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
                         except Exception as ex:
-                            output_text = f"[Gemini streaming error: {ex}]"
+                            error_msg = str(ex)
+                            if "finish_reason is 2" in error_msg or "no valid Part" in error_msg:
+                                output_text = "[Gemini output was filtered or blocked. The model could not return a response for this prompt. Try rephrasing or using a different prompt.]"
+                            else:
+                                output_text = f"[Gemini streaming error: {ex}]"
                             output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
                     else:
                         if not output_text:

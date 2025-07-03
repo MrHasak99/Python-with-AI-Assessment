@@ -326,26 +326,34 @@ if generate_btn:
                         multimodal_prompt = full_prompt
                         if tool_call_result:
                             multimodal_prompt = f"Weather info: {tool_call_result}\n\n{full_prompt}"
-                        response = model.generate_content(
-                            [multimodal_prompt, image],
-                            generation_config={
-                                "temperature": temperature,
-                                "max_output_tokens": int(max_tokens),
-                            },
-                        )
+                        try:
+                            response = model.generate_content(
+                                [multimodal_prompt, image],
+                                generation_config={
+                                    "temperature": temperature,
+                                    "max_output_tokens": int(max_tokens),
+                                },
+                            )
+                        except Exception as ex:
+                            response = None
+                            output_text = f"[Gemini API error: {ex}]"
                     else:
                         model = genai.GenerativeModel("models/gemini-2.5-flash")
                         text_prompt = full_prompt
                         if tool_call_result:
                             text_prompt = f"Weather info: {tool_call_result}\n\n{full_prompt}"
-                        response = model.generate_content(
-                            text_prompt,
-                            generation_config={
-                                "temperature": temperature,
-                                "max_output_tokens": int(max_tokens),
-                            },
-                            stream=True
-                        )
+                        try:
+                            response = model.generate_content(
+                                text_prompt,
+                                generation_config={
+                                    "temperature": temperature,
+                                    "max_output_tokens": int(max_tokens),
+                                },
+                                stream=True
+                            )
+                        except Exception as ex:
+                            response = None
+                            output_text = f"[Gemini API error: {ex}]"
                     progress = st.progress(0, text="Streaming Gemini output...")
                     chunk_count = 0
                     if response is not None:
@@ -362,8 +370,9 @@ if generate_btn:
                                 output_text = "[No valid response returned by Gemini. The output may have been filtered, blocked, or the model returned no content.]"
                                 output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
                         elif hasattr(response, "text"):
-                            if response.text:
-                                for word in response.text.split():
+                            text_val = getattr(response, "text", None)
+                            if text_val:
+                                for word in text_val.split():
                                     output_text += word + " "
                                     output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
                                     chunk_count += 1
@@ -376,7 +385,8 @@ if generate_btn:
                             output_text = str(response)
                             output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
                     else:
-                        output_text = "[No response returned by Gemini. The model may have returned no candidates or the request was blocked.]"
+                        if not output_text:
+                            output_text = "[No response returned by Gemini. The model may have returned no candidates or the request was blocked.]"
                         output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
                     progress.progress(100, text="Streaming complete.")
             except Exception as ex:

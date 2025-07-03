@@ -309,59 +309,66 @@ if generate_btn:
             return outputs[-1]
 
         with st.spinner("Generating response..."):
-            if any(x in prompt.lower() for x in ["multi-step", "chain", "reasoning", "step by step"]):
-                output_text = multi_step_reasoning(full_prompt)
-            else:
-                import time
-                if uploaded_image:
-                    import PIL.Image
-                    from io import BytesIO
-                    image = PIL.Image.open(BytesIO(uploaded_image.read()))
-                    model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
-                    multimodal_prompt = full_prompt
-                    if tool_call_result:
-                        multimodal_prompt = f"Weather info: {tool_call_result}\n\n{full_prompt}"
-                    response = model.generate_content(
-                        [multimodal_prompt, image],
-                        generation_config={
-                            "temperature": temperature,
-                            "max_output_tokens": int(max_tokens),
-                        },
-                    )
+            try:
+                if any(x in prompt.lower() for x in ["multi-step", "chain", "reasoning", "step by step"]):
+                    output_text = multi_step_reasoning(full_prompt)
                 else:
-                    model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
-                    text_prompt = full_prompt
-                    if tool_call_result:
-                        text_prompt = f"Weather info: {tool_call_result}\n\n{full_prompt}"
-                    response = model.generate_content(
-                        text_prompt,
-                        generation_config={
-                            "temperature": temperature,
-                            "max_output_tokens": int(max_tokens),
-                        },
-                        stream=True
-                    )
-                output_text = ""
-                progress = st.progress(0, text="Streaming Gemini output...")
-                chunk_count = 0
-                if hasattr(response, "__iter__"):
-                    for chunk in response:
-                        chunk_count += 1
-                        output_text += getattr(chunk, "text", str(chunk))
+                    import time
+                    if uploaded_image:
+                        import PIL.Image
+                        from io import BytesIO
+                        image = PIL.Image.open(BytesIO(uploaded_image.read()))
+                        model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+                        multimodal_prompt = full_prompt
+                        if tool_call_result:
+                            multimodal_prompt = f"Weather info: {tool_call_result}\n\n{full_prompt}"
+                        response = model.generate_content(
+                            [multimodal_prompt, image],
+                            generation_config={
+                                "temperature": temperature,
+                                "max_output_tokens": int(max_tokens),
+                            },
+                        )
+                    else:
+                        model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+                        text_prompt = full_prompt
+                        if tool_call_result:
+                            text_prompt = f"Weather info: {tool_call_result}\n\n{full_prompt}"
+                        response = model.generate_content(
+                            text_prompt,
+                            generation_config={
+                                "temperature": temperature,
+                                "max_output_tokens": int(max_tokens),
+                            },
+                            stream=True
+                        )
+                    output_text = ""
+                    progress = st.progress(0, text="Streaming Gemini output...")
+                    chunk_count = 0
+                    if hasattr(response, "__iter__"):
+                        for chunk in response:
+                            chunk_count += 1
+                            output_text += getattr(chunk, "text", str(chunk))
+                            output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
+                            progress.progress(min(chunk_count * 5, 100), text="Streaming Gemini output...")
+                            time.sleep(0.01)
+                    elif hasattr(response, "text"):
+                        for word in response.text.split():
+                            output_text += word + " "
+                            output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
+                            chunk_count += 1
+                            progress.progress(min(chunk_count * 2, 100), text="Streaming Gemini output...")
+                            time.sleep(0.01)
+                    else:
+                        output_text = str(response)
                         output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
-                        progress.progress(min(chunk_count * 5, 100), text="Streaming Gemini output...")
-                        time.sleep(0.01)
-                elif hasattr(response, "text"):
-                    for word in response.text.split():
-                        output_text += word + " "
-                        output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
-                        chunk_count += 1
-                        progress.progress(min(chunk_count * 2, 100), text="Streaming Gemini output...")
-                        time.sleep(0.01)
+                    progress.progress(100, text="Streaming complete.")
+            except Exception as ex:
+                import google.api_core
+                if isinstance(ex, google.api_core.exceptions.ResourceExhausted):
+                    st.error("Gemini API quota exceeded or resource exhausted. Please wait, reduce usage, or check your Google Cloud quota.")
                 else:
-                    output_text = str(response)
-                    output_placeholder.markdown(f"**Gemini Output:**\n\n{output_text}")
-                progress.progress(100, text="Streaming complete.")
+                    st.error(f"An error occurred: {ex}")
 
             if any(b in output_text.lower() for b in blacklist):
                 st.warning("AI output contains blacklisted keywords/phrases. Please review the content.")
